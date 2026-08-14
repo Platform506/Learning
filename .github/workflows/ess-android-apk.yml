@@ -1,0 +1,88 @@
+name: ESS Android APK
+
+# Compila el APK en runners Ubuntu de GitHub (suficiente RAM).
+# No requiere cuenta Expo ni EXPO_TOKEN.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - 'ess/**'
+      - '.github/workflows/ess-android-apk.yml'
+
+concurrency:
+  group: ess-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Gradle assembleRelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ess/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK components
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install JS dependencies
+        working-directory: ess
+        run: npm ci
+
+      - name: Expo prebuild
+        working-directory: ess
+        run: CI=1 npx expo prebuild --platform android --no-install
+
+      - name: Tune Gradle for CI
+        working-directory: ess
+        run: |
+          {
+            echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8'
+            echo 'org.gradle.parallel=true'
+            echo 'org.gradle.workers.max=2'
+            echo 'android.useAndroidX=true'
+            echo 'reactNativeArchitectures=arm64-v8a'
+          } >> android/gradle.properties
+
+      - name: Build release APK
+        working-directory: ess/android
+        env:
+          CMAKE_BUILD_PARALLEL_LEVEL: '2'
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ess-cuadratura-apk
+          path: ess/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
