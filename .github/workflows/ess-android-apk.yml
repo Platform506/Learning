@@ -18,7 +18,7 @@ jobs:
   build-apk:
     name: Gradle assembleRelease
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: ess/package-lock.json
 
@@ -58,7 +58,10 @@ jobs:
 
       - name: Expo prebuild
         working-directory: ess
-        run: CI=1 npx expo prebuild --platform android --no-install
+        env:
+          NODE_ENV: production
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install
 
       - name: Tune Gradle for CI
         working-directory: ess
@@ -71,13 +74,19 @@ jobs:
             echo 'reactNativeArchitectures=arm64-v8a'
           } >> android/gradle.properties
 
+      - name: Verify node resolve from android/
+        working-directory: ess/android
+        run: |
+          node -e "console.log('node', process.version); console.log(require('path').dirname(require.resolve('expo-constants/package.json')));"
+
       - name: Build release APK
         working-directory: ess/android
         env:
+          NODE_ENV: production
           CMAKE_BUILD_PARALLEL_LEVEL: '2'
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+          ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
