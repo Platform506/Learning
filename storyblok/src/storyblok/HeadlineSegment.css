@@ -1,0 +1,8 @@
+.headline-segment {
+  color: inherit;
+}
+
+.headline-segment--primary-highlight,
+.headline-segment--color_3 {
+  color: #5b4dff;
+}

@@ -42,6 +42,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "prebuild:android": "CI=1 npx expo prebuild --platform android",
+    "build:apk": "eas build --platform android --profile preview",
     "build:apk:ci": "echo Use GitHub Actions workflow ess-android-apk.yml"
   },
   "private": true
